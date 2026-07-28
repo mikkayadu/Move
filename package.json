@@ -1,0 +1,24 @@
+{
+  "name": "move",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Move - pre-departure intelligence. One tap tells you whether to leave now.",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev -w @move/api\" \"npm run dev -w @move/web\"",
+    "build": "npm run build -w @move/api && npm run build -w @move/web",
+    "test": "npm run test -w @move/api",
+    "start": "npm run start -w @move/api",
+    "models": "npm run models -w @move/api",
+    "keys": "npm run keys -w @move/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

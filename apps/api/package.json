@@ -1,0 +1,34 @@
+{
+  "name": "@move/api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Move backend - routing, weather sampling, and Gemma 4 reasoning.",
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "test": "nest build && node --test",
+    "models": "node scripts/list-models.js",
+    "keys": "node scripts/generate-vapid.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.12",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.0.12",
+    "@nestjs/platform-express": "^11.0.12",
+    "@nestjs/schedule": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.5",
+    "@nestjs/schematics": "^11.0.2",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/web-push": "^3.6.4",
+    "typescript": "^5.7.2"
+  }
+}
