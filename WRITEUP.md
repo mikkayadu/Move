@@ -30,7 +30,7 @@ That is what lets the model say *"leave in the next twenty minutes and you stay 
 
 ## How Gemma 4 is used
 
-Gemma 4 is the reasoning layer, not a chatbot bolted onto a dashboard. It is the only component that makes a judgement; everything around it is deterministic plumbing.
+Gemma 4 is the reasoning layer, not a chatbot bolted onto a dashboard. It is the only component that makes a judgement; everything else is deterministic plumbing.
 
 **The system role carries a strict contract.** Gemma 4's native `system` role holds a locked output schema, so the interface renders from typed fields and never parses free text. The prompt also encodes judgement the raw numbers do not contain - *"a traffic delay under five minutes is normal, never tell someone to wait it out"*, *"only recommend waiting when the numbers support it"*, *"reason only from the briefing, and if a field is null work without it"*. That last line matters more than it looks: it is what stops a small model inventing a forecast when the weather API is down.
 
@@ -54,7 +54,7 @@ A **React PWA** talks to a **NestJS** backend over a single endpoint, `POST /api
 
 **Why Open-Meteo:** no API key at all, which removed a signup, a secret, and a rate limit from the critical path, and it batches coordinates so every sample point costs one round trip.
 
-**Why no ORM:** Node 24 ships SQLite in core. Four small tables did not justify one, and `node:sqlite` cannot fail to install.
+**Why no ORM:** Node 24 ships SQLite in core, four small tables did not justify one, and `node:sqlite` cannot fail to install.
 
 ## Designed for weak connections
 
