@@ -231,7 +231,10 @@ The two services reference each other's hostnames through `fromService`, so ther
 
 HTTPS is required either way: service workers and Web Push do not work over plain HTTP.
 
-Mount the disk at `/app/data`. Without it the free plan wipes SQLite on every deploy, taking the graceful-degradation cache with it.
+**Free-tier caveats, both real:**
+
+- **Persistent disks require a paid instance.** On the free plan SQLite sits on ephemeral storage, so saved destinations, push subscriptions, and the stale cache are wiped on every deploy and every wake from sleep. The schema is re-created on boot, so the app starts empty rather than broken. To keep data, switch the API to `plan: starter` and uncomment the `disk:` block in `render.yaml`.
+- **Free web services sleep when idle** and take the better part of a minute to wake. The static site never sleeps, so the page loads instantly and then the first recommendation hangs. Warm the API before demoing, or pay for the API instance. This also means the background notification sweep only runs while something is keeping the service awake.
 
 `netlify.toml` is kept as an alternative host for the PWA. `apps/web/public/_redirects` carries the single-page routing rule in a format both providers understand, so routing survives a change of host.
 

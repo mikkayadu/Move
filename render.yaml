@@ -1,4 +1,10 @@
-# Render blueprint for Move - both the API and the PWA on one account.
+# Render blueprint for Move.
+#
+# Two services, two different kinds:
+#   move-api  - a WEB SERVICE. A NestJS process that must stay running to
+#               answer requests, hold SQLite, and fire the notification sweep.
+#   move-web  - a STATIC SITE. The built PWA is just files; nothing executes
+#               on the server, so it is served straight from Render's CDN.
 #
 # Deploy: https://dashboard.render.com/blueprints -> New Blueprint Instance,
 # point it at this repo, then fill in the values marked `sync: false`.
@@ -7,6 +13,12 @@
 # URL copying: the PWA learns where the API lives and the API learns which
 # origin to allow. Both sides add the https:// scheme themselves, because a
 # `fromService` reference yields a bare hostname.
+#
+# FREE TIER CAVEAT: a free web service sleeps after a stretch of inactivity
+# and takes the better part of a minute to wake. The static site does not
+# sleep. So the page loads instantly and the first recommendation hangs -
+# which is exactly the wrong impression for a judge clicking a cold link.
+# Warm it yourself right before demoing, or run the API on a paid instance.
 services:
   # ---------------------------------------------------------------- API ----
   - type: web
@@ -42,12 +54,19 @@ services:
         sync: false
       - key: VAPID_SUBJECT
         value: mailto:hello@move.app
-    disk:
-      # Without a disk the free plan wipes SQLite on every deploy, taking the
-      # graceful-degradation cache and every saved destination with it.
-      name: move-data
-      mountPath: /app/data
-      sizeGB: 1
+    # NOTE: persistent disks require a PAID instance type. On the free plan
+    # SQLite lives on ephemeral storage, so saved destinations, push
+    # subscriptions, and the stale-recommendation cache are wiped on every
+    # deploy and on every wake from sleep. That is survivable for a demo -
+    # the app re-creates its schema on boot and simply starts empty.
+    #
+    # To keep data, change `plan: free` to `plan: starter` above and
+    # uncomment this block:
+    #
+    # disk:
+    #   name: move-data
+    #   mountPath: /app/data
+    #   sizeGB: 1
 
   # ---------------------------------------------------------------- PWA ----
   - type: web
