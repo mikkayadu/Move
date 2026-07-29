@@ -9,8 +9,18 @@ import type {
 /**
  * In development Vite proxies /api to the NestJS process, so the browser stays
  * on one origin. In production VITE_API_BASE_URL points at the deployed API.
+ *
+ * The scheme is added when missing because Render's blueprint reference
+ * supplies a bare hostname, and wiring the two services together
+ * automatically is worth more than insisting the variable be perfectly formed.
  */
-const BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const BASE = normaliseBase(import.meta.env.VITE_API_BASE_URL ?? '');
+
+function normaliseBase(raw: string): string {
+  const trimmed = raw.trim().replace(/\/$/, '');
+  if (!trimmed || /^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
 
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {

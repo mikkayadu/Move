@@ -1,0 +1,4 @@
+# Single-page app fallback. Understood by both Render and Netlify static
+# hosting, so the routing rule survives a change of provider and does not
+# depend on blueprint syntax being accepted.
+/*  /index.html  200

@@ -210,16 +210,22 @@ curl -X POST http://localhost:3001/api/notifications/sweep
 
 ## Deploying
 
-| Piece | Target | Config |
+`render.yaml` deploys **both** services to a single Render account:
+
+| Service | Type | Source |
 | --- | --- | --- |
-| API | Render (Docker) | `render.yaml`, `apps/api/Dockerfile` |
-| PWA | Netlify | `netlify.toml` |
+| `move-api` | Docker web service | `apps/api/Dockerfile` |
+| `move-web` | Static site | `apps/web/dist` |
 
-Two variables tie them together: set `VITE_API_BASE_URL` on Netlify to the API origin, and `CORS_ORIGINS` on Render to the Netlify origin.
+From the Render dashboard, create a Blueprint Instance pointed at the repo, then fill in the values marked `sync: false`: `GOOGLE_AI_API_KEY`, `MAPBOX_ACCESS_TOKEN`, `GEMMA_MODEL`, and the VAPID pair.
 
-HTTPS is required - service workers and Web Push do not work over plain HTTP.
+The two services reference each other's hostnames through `fromService`, so there is **no manual URL wiring** - the PWA learns where the API lives and the API learns which origin to allow. A `fromService` reference yields a bare hostname, so both sides add the `https://` scheme themselves.
 
-Mount the Render disk at `/app/data`. Without it the free plan wipes SQLite on every deploy, taking the graceful-degradation cache with it.
+HTTPS is required either way: service workers and Web Push do not work over plain HTTP.
+
+Mount the disk at `/app/data`. Without it the free plan wipes SQLite on every deploy, taking the graceful-degradation cache with it.
+
+`netlify.toml` is kept as an alternative host for the PWA. `apps/web/public/_redirects` carries the single-page routing rule in a format both providers understand, so routing survives a change of host.
 
 ---
 

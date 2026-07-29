@@ -27,12 +27,24 @@ function toInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/**
+ * CORS comparison is exact, so a bare hostname would silently reject every
+ * browser request. Render's `fromService` reference yields a hostname with no
+ * scheme, so we add the one it must have been: anything not on localhost is
+ * served over HTTPS, which service workers and Web Push require anyway.
+ */
+function toOrigin(value: string): string {
+  const trimmed = value.trim().replace(/\/$/, '');
+  if (!trimmed || trimmed === '*' || /^https?:\/\//i.test(trimmed)) return trimmed;
+  return `${trimmed.startsWith('localhost') ? 'http' : 'https'}://${trimmed}`;
+}
+
 export default (): AppConfig => ({
   port: toInt(process.env.PORT, 3001),
   nodeEnv: process.env.NODE_ENV ?? 'development',
   corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
     .split(',')
-    .map((origin) => origin.trim())
+    .map(toOrigin)
     .filter(Boolean),
   databasePath: process.env.DATABASE_PATH ?? './data/move.sqlite',
   upstreamTimeoutMs: toInt(process.env.UPSTREAM_TIMEOUT_MS, 8000),
