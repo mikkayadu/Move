@@ -1,26 +1,28 @@
-# Render blueprint for Move.
+# Render blueprint for the Move API.
 #
-# Two services, two different kinds:
-#   move-api  - a WEB SERVICE. A NestJS process that must stay running to
-#               answer requests, hold SQLite, and fire the notification sweep.
-#   move-web  - a STATIC SITE. The built PWA is just files; nothing executes
-#               on the server, so it is served straight from Render's CDN.
+# This deploys the backend only - a WEB SERVICE, because NestJS has to stay
+# running to answer requests, hold SQLite, and fire the notification sweep.
+# The PWA is hosted separately; see "Deploying" in README.md.
 #
 # Deploy: https://dashboard.render.com/blueprints -> New Blueprint Instance,
-# point it at this repo, then fill in the values marked `sync: false`.
+# point it at this repo, then fill in every value marked `sync: false`.
 #
-# The two services reference each other's hostnames, so there is no manual
-# URL copying: the PWA learns where the API lives and the API learns which
-# origin to allow. Both sides add the https:// scheme themselves, because a
-# `fromService` reference yields a bare hostname.
+# TWO VALUES TIE THE HALVES TOGETHER, and both must be set by hand:
+#   1. CORS_ORIGINS here  -> the URL your frontend is served from
+#   2. VITE_API_BASE_URL on the frontend host -> this service's URL
+# Get either wrong and the browser blocks every request. If you only have the
+# hostname, that is fine: the API adds the https:// scheme itself.
 #
-# FREE TIER CAVEAT: a free web service sleeps after a stretch of inactivity
-# and takes the better part of a minute to wake. The static site does not
-# sleep. So the page loads instantly and the first recommendation hangs -
-# which is exactly the wrong impression for a judge clicking a cold link.
-# Warm it yourself right before demoing, or run the API on a paid instance.
+# FREE TIER CAVEATS, both real:
+#   - A free web service sleeps when idle and takes the better part of a
+#     minute to wake. A judge clicking a cold link sees the page load fast
+#     and the first recommendation hang. Warm it before demoing, or point an
+#     uptime pinger at /api/health, or run it on a paid instance.
+#   - Persistent disks need a PAID instance. On free, SQLite sits on
+#     ephemeral storage, so saved destinations, push subscriptions, and the
+#     stale-recommendation cache are wiped on every deploy and every wake.
+#     The schema is re-created on boot, so the app starts empty, not broken.
 services:
-  # ---------------------------------------------------------------- API ----
   - type: web
     name: move-api
     runtime: docker
@@ -35,69 +37,34 @@ services:
         value: 3001
       - key: DATABASE_PATH
         value: /app/data/move.sqlite
+
+      # The origin your PWA is served from, e.g. https://move.netlify.app
+      # Comma-separated if you have more than one.
       - key: CORS_ORIGINS
-        fromService:
-          name: move-web
-          type: web
-          property: host
-      # Paste these in the dashboard - they are secrets.
+        sync: false
+
+      # Secrets - paste these in the dashboard, never commit them.
       - key: GOOGLE_AI_API_KEY
         sync: false
       - key: MAPBOX_ACCESS_TOKEN
         sync: false
+
       # Set to whatever `npm run models` reported for your key.
       - key: GEMMA_MODEL
         sync: false
+
+      # From `npm run keys`. Without them push is disabled, nothing else.
       - key: VAPID_PUBLIC_KEY
         sync: false
       - key: VAPID_PRIVATE_KEY
         sync: false
       - key: VAPID_SUBJECT
         value: mailto:hello@move.app
-    # NOTE: persistent disks require a PAID instance type. On the free plan
-    # SQLite lives on ephemeral storage, so saved destinations, push
-    # subscriptions, and the stale-recommendation cache are wiped on every
-    # deploy and on every wake from sleep. That is survivable for a demo -
-    # the app re-creates its schema on boot and simply starts empty.
-    #
-    # To keep data, change `plan: free` to `plan: starter` above and
-    # uncomment this block:
+
+    # To keep data across deploys, change `plan: free` to `plan: starter`
+    # above and uncomment this:
     #
     # disk:
     #   name: move-data
     #   mountPath: /app/data
     #   sizeGB: 1
-
-  # ---------------------------------------------------------------- PWA ----
-  - type: web
-    name: move-web
-    runtime: static
-    buildCommand: npm install && npm run build --workspace @move/web
-    staticPublishPath: apps/web/dist
-    pullRequestPreviewsEnabled: false
-    envVars:
-      - key: NODE_VERSION
-        value: 24
-      - key: VITE_API_BASE_URL
-        fromService:
-          name: move-api
-          type: web
-          property: host
-    routes:
-      # apps/web/public/_redirects carries the same rule, so single-page
-      # routing still works if this block is not applied.
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    headers:
-      # A cached service worker strands users on an old build for as long as
-      # the cache lives. This is the one file that must always revalidate.
-      - path: /sw.js
-        name: Cache-Control
-        value: no-cache, no-store, must-revalidate
-      - path: /manifest.webmanifest
-        name: Cache-Control
-        value: no-cache
-      - path: /assets/*
-        name: Cache-Control
-        value: public, max-age=31536000, immutable

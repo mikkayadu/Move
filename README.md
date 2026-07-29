@@ -218,18 +218,27 @@ curl -X POST http://localhost:3001/api/notifications/sweep
 
 ## Deploying
 
-`render.yaml` deploys **both** services to a single Render account:
+The two halves deploy separately.
 
-| Service | Type | Source |
-| --- | --- | --- |
-| `move-api` | Docker web service | `apps/api/Dockerfile` |
-| `move-web` | Static site | `apps/web/dist` |
+| Piece | Type | Where | Config |
+| --- | --- | --- | --- |
+| API | **Web service** - a process that must stay running | Render | `render.yaml`, `apps/api/Dockerfile` |
+| PWA | **Static site** - just built files, nothing executes | Anywhere static | `netlify.toml` if you use Netlify |
 
-From the Render dashboard, create a Blueprint Instance pointed at the repo, then fill in the values marked `sync: false`: `GOOGLE_AI_API_KEY`, `MAPBOX_ACCESS_TOKEN`, `GEMMA_MODEL`, and the VAPID pair.
+The API cannot be a static site: it holds the API keys, owns the SQLite file, and runs the notification timer. The PWA should not be a web service: `vite build` produces finished files, so a CDN serves them better and free.
 
-The two services reference each other's hostnames through `fromService`, so there is **no manual URL wiring** - the PWA learns where the API lives and the API learns which origin to allow. A `fromService` reference yields a bare hostname, so both sides add the `https://` scheme themselves.
+**API on Render:** create a Blueprint Instance pointed at the repo, then fill in every value marked `sync: false` - `GOOGLE_AI_API_KEY`, `MAPBOX_ACCESS_TOKEN`, `GEMMA_MODEL`, the VAPID pair, and `CORS_ORIGINS`.
 
-HTTPS is required either way: service workers and Web Push do not work over plain HTTP.
+**PWA anywhere static:** build with `npm run build --workspace @move/web` and publish `apps/web/dist`. `apps/web/public/_redirects` carries the single-page routing rule in a format both Netlify and Render understand.
+
+**Two values wire the halves together, and both are manual:**
+
+1. `CORS_ORIGINS` on Render → the origin the PWA is served from
+2. `VITE_API_BASE_URL` on the frontend host → the API's URL, set at **build** time
+
+Get either wrong and the browser blocks every request. A bare hostname is fine for both: each side adds the `https://` scheme itself.
+
+HTTPS is required: service workers and Web Push do not work over plain HTTP.
 
 **Free-tier caveats, both real:**
 
