@@ -83,36 +83,80 @@ export class GemmaService {
     return text;
   }
 
+  /**
+   * Retries once with the specific feature the model complained about turned
+   * off.
+   *
+   * These two capabilities are downgraded independently, which matters more
+   * than it looks: the served Gemma 4 variants accept `systemInstruction` but
+   * reject `thinkingConfig`. Dropping both together would push us onto the
+   * folded-prompt path, where thinking tokens eat the output budget and the
+   * answer gets truncated mid-string. Turning off only the rejected field
+   * keeps the system contract intact.
+   */
   private async callWithDowngrade(userText: string): Promise<GenerateContentResponse> {
-    try {
-      return await this.call<GenerateContentResponse>(
+    const send = (): Promise<GenerateContentResponse> =>
+      this.call<GenerateContentResponse>(
         `${API_ROOT}/models/${this.model}:generateContent`,
         this.buildBody(userText),
       );
-    } catch (error) {
-      const isBadRequest = error instanceof UpstreamError && error.status === 400;
-      const canDowngrade = this.capabilities.systemInstruction || this.capabilities.thinkingConfig;
 
-      if (!isBadRequest || !canDowngrade) throw error;
+    try {
+      return await send();
+    } catch (error) {
+      if (!(error instanceof UpstreamError) || error.status !== 400) throw error;
+
+      const downgraded = this.downgradeFor(error.message);
+      if (!downgraded) throw error;
 
       this.logger.warn(
-        `${this.model} rejected an optional request field; retrying without ` +
-          'systemInstruction and thinkingConfig. This is expected on some Gemma deployments.',
+        `${this.model} rejected ${downgraded}; retrying without it. ` +
+          'This is expected on some Gemma deployments.',
       );
-      this.capabilities = { systemInstruction: false, thinkingConfig: false };
-
-      return this.call<GenerateContentResponse>(
-        `${API_ROOT}/models/${this.model}:generateContent`,
-        this.buildBody(userText),
-      );
+      return send();
     }
+  }
+
+  /**
+   * Reads the API's complaint and disables only that feature. Falls back to
+   * dropping thinking control first, since that is the field most commonly
+   * unsupported and the least costly to lose.
+   */
+  private downgradeFor(message: string): string | null {
+    const complaint = message.toLowerCase();
+
+    if (this.capabilities.thinkingConfig && complaint.includes('thinking')) {
+      this.capabilities = { ...this.capabilities, thinkingConfig: false };
+      return 'thinkingConfig';
+    }
+
+    if (this.capabilities.systemInstruction && complaint.includes('system')) {
+      this.capabilities = { ...this.capabilities, systemInstruction: false };
+      return 'systemInstruction';
+    }
+
+    if (this.capabilities.thinkingConfig) {
+      this.capabilities = { ...this.capabilities, thinkingConfig: false };
+      return 'thinkingConfig';
+    }
+
+    if (this.capabilities.systemInstruction) {
+      this.capabilities = { ...this.capabilities, systemInstruction: false };
+      return 'systemInstruction';
+    }
+
+    return null;
   }
 
   private buildBody(userText: string): Record<string, unknown> {
     const generationConfig: Record<string, unknown> = {
       temperature: 0.2,
       topP: 0.9,
-      maxOutputTokens: 800,
+      // Thinking tokens are charged against this budget, and the served Gemma 4
+      // variants think for 600-800 tokens before answering even on a small
+      // briefing. At 800 the answer was being truncated mid-string; this leaves
+      // room for the reasoning plus the ~200 token result.
+      maxOutputTokens: 2500,
     };
 
     // Move wants a fast, decisive answer, not visible exploration, so thinking

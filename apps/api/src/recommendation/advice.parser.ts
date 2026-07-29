@@ -22,13 +22,10 @@ const MODES: TravelMode[] = ['driving', 'walking'];
  * card is worse than an error.
  */
 export function parseAdvice(raw: string): Advice {
-  const json = extractJsonObject(raw);
+  const parsed = selectAnswerObject(raw);
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(json) as Record<string, unknown>;
-  } catch (error) {
-    throw new AdviceParseError(`Model output was not valid JSON: ${String(error)}`, raw);
+  if (!parsed) {
+    throw new AdviceParseError('Model output contained no usable JSON object', raw);
   }
 
   const headline = asText(parsed.headline);
@@ -78,24 +75,50 @@ function repairContradictions(advice: Advice): Advice {
 }
 
 /**
- * Pulls the first balanced `{...}` out of the response, tolerating code
- * fences, a "Here is the JSON:" preamble, or trailing chatter.
+ * Chooses the object that is actually the answer.
+ *
+ * The served Gemma 4 variants have thinking permanently enabled and emit that
+ * reasoning into the response body, so a reply is typically pages of prose
+ * followed by the real JSON. The prose frequently contains draft objects and
+ * fenced examples of its own, which means taking the *first* object returns a
+ * discarded draft.
+ *
+ * So we collect every balanced top-level object and walk them backwards: the
+ * model's final answer is its last one. Walking backwards also recovers the
+ * last complete draft when the real answer was cut off mid-string by the token
+ * limit, which beats failing outright.
  */
-function extractJsonObject(raw: string): string {
-  const withoutFences = raw
-    .replace(/^\s*```(?:json|JSON)?\s*/m, '')
-    .replace(/```\s*$/m, '')
-    .trim();
+function selectAnswerObject(raw: string): Record<string, unknown> | null {
+  const candidates = findBalancedObjects(raw);
 
-  const start = withoutFences.indexOf('{');
-  if (start === -1) return withoutFences;
+  for (let i = candidates.length - 1; i >= 0; i -= 1) {
+    try {
+      const parsed = JSON.parse(candidates[i]) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const record = parsed as Record<string, unknown>;
+        // Drafts and the final answer both parse; only accept one that
+        // carries the field the card cannot render without.
+        if (asText(record.headline)) return record;
+      }
+    } catch {
+      // A truncated or malformed candidate simply loses to an earlier one.
+    }
+  }
+
+  return null;
+}
+
+/** Every balanced `{...}` span in the text, in the order they appear. */
+function findBalancedObjects(raw: string): string[] {
+  const found: string[] = [];
 
   let depth = 0;
+  let start = -1;
   let inString = false;
   let escaped = false;
 
-  for (let i = start; i < withoutFences.length; i += 1) {
-    const char = withoutFences[i];
+  for (let i = 0; i < raw.length; i += 1) {
+    const char = raw[i];
 
     if (escaped) {
       escaped = false;
@@ -111,14 +134,19 @@ function extractJsonObject(raw: string): string {
     }
     if (inString) continue;
 
-    if (char === '{') depth += 1;
-    if (char === '}') {
+    if (char === '{') {
+      if (depth === 0) start = i;
+      depth += 1;
+    } else if (char === '}' && depth > 0) {
       depth -= 1;
-      if (depth === 0) return withoutFences.slice(start, i + 1);
+      if (depth === 0 && start !== -1) {
+        found.push(raw.slice(start, i + 1));
+        start = -1;
+      }
     }
   }
 
-  return withoutFences.slice(start);
+  return found;
 }
 
 function asText(value: unknown): string | null {

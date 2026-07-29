@@ -65,14 +65,21 @@ React PWA  ──POST /api/recommendation──▶  NestJS API
 
 Gemma 4 is the reasoning layer, not a chatbot bolted on the side.
 
+Model: **`gemma-4-26b-a4b-it`**, the sparse mixture-of-experts variant with roughly 4B active parameters. It and `gemma-4-31b-it` are the only Gemma 4 variants served on the AI Studio API - the smaller E2B/E4B/12B sizes are not available there, so the MoE model is the fast option.
+
 - The **system role** carries a strict output contract, so the UI renders from typed fields with no free-text parsing.
-- **Thinking mode is disabled** (`thinkingBudget: 0`) - Move wants a fast decision, not visible exploration.
 - The briefing is deliberately **verbose and readable** rather than compressed. Gemma 4's context window is far larger than one trip needs, and readable field names measurably improve small-model reasoning.
 - The prompt encodes human judgement the raw data does not contain, for example *"a traffic delay under 5 minutes is normal, never tell someone to wait it out"*.
+- The client asks for `thinkingBudget: 0`, but **this model rejects it** and thinks unconditionally. The request is still made because other deployments accept it, and the client downgrades cleanly when it is refused.
+
+**Thinking is always on, and it lands in the response body.** A real reply is several hundred tokens of reasoning prose, often containing draft JSON objects and fenced examples, followed by the actual answer. Two consequences shape the code:
+
+- `maxOutputTokens` is **2500**, because thinking tokens are charged against that budget. At 800 the answer was being truncated mid-string.
+- The parser collects *every* balanced object and walks them **backwards**, since the model's final answer is its last one. Taking the first object returns a discarded draft.
 
 The model's output is treated as untrusted input:
 
-1. Code fences and prose are stripped, and the first balanced `{...}` is extracted with a string-aware scanner.
+1. Every balanced `{...}` is located with a string-aware scanner and the candidates are tried newest-first, so leaked reasoning and draft objects are skipped. A truncated final answer falls back to the last complete draft rather than failing.
 2. Fields are coerced - `"about 20 minutes"` becomes `20`, `"5:40 PM"` becomes `"17:40"`, `"WALKING"` becomes `walking`.
 3. Contradictions are repaired - a `wait` with no duration becomes `leave_now`, because a blank card is worse than a corrected one.
 4. Mode choice is reconciled against reality, so the model can never recommend a 90-minute walk.
@@ -130,7 +137,7 @@ curl http://localhost:3001/api/health
 ```json
 {
   "status": "ok",
-  "model": "gemma-4-e4b-it",
+  "model": "gemma-4-26b-a4b-it",
   "configured": { "gemma": true, "mapbox": true, "weather": true, "push": true }
 }
 ```

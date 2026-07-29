@@ -177,8 +177,11 @@ export class RoutingService {
     if (mode === 'driving') {
       url.searchParams.set('annotations', 'duration,congestion_numeric');
       if (departAt) {
-        // Mapbox expects a local ISO string with no timezone suffix.
-        url.searchParams.set('depart_at', departAt.toISOString().slice(0, 19));
+        // Mapbox accepts YYYY-MM-DDThh:mm, YYYY-MM-DDThh:mm:ssZ, or an
+        // explicit offset - and nothing else. toISOString() carries
+        // milliseconds, which is rejected with a 422, so trim to whole seconds
+        // and keep the Z.
+        url.searchParams.set('depart_at', `${departAt.toISOString().slice(0, 19)}Z`);
       }
     }
 

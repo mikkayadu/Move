@@ -48,6 +48,44 @@ describe('parseAdvice - packaging tolerance', () => {
     assert.throws(() => parseAdvice(JSON.stringify({ ...VALID, headline: '' })), AdviceParseError);
   });
 
+  // The served Gemma 4 variants cannot have thinking disabled and emit their
+  // reasoning into the response body, so a real reply is prose containing
+  // draft objects, followed by the actual answer.
+  it('takes the final object when the model thinks out loud first', () => {
+    const raw = [
+      '*   Weighing the options:',
+      '    *   Driving is faster than walking here.',
+      '    *   Draft: ```json',
+      JSON.stringify({ ...VALID, headline: 'DRAFT - do not use' }),
+      '    ```',
+      '*   Refining the answer:',
+      JSON.stringify({ ...VALID, headline: 'Leave now, the road is clear.' }),
+    ].join('\n');
+
+    assert.equal(parseAdvice(raw).headline, 'Leave now, the road is clear.');
+  });
+
+  it('falls back to the last complete draft when the answer is truncated', () => {
+    const raw = [
+      'Thinking...',
+      JSON.stringify({ ...VALID, headline: 'Recoverable draft.' }),
+      'Final answer:',
+      '{"recommendation":"leave_now","headline":"cut off mid-str',
+    ].join('\n');
+
+    assert.equal(parseAdvice(raw).headline, 'Recoverable draft.');
+  });
+
+  it('ignores objects that parse but carry no headline', () => {
+    const raw = [
+      '{"note":"scratch work, no headline here"}',
+      JSON.stringify(VALID),
+      '{"trailing":"also no headline"}',
+    ].join('\n');
+
+    assert.equal(parseAdvice(raw).headline, 'Leave now, the road is clear.');
+  });
+
   it('rejects output that is not JSON at all', () => {
     assert.throws(() => parseAdvice('I cannot help with that.'), AdviceParseError);
   });
