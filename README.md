@@ -54,7 +54,8 @@ React PWA  ──POST /api/recommendation──▶  NestJS API
 
 | Module | Responsibility |
 | --- | --- |
-| `RoutingModule` | Mapbox geocoding, driving-traffic and walking routes, predictive `depart_at` ETAs, congestion share |
+| `PlacesModule` | Destination search and reverse geocoding via Photon/OpenStreetMap, Ghana-restricted, with result ranking |
+| `RoutingModule` | Mapbox driving-traffic and walking routes, predictive `depart_at` ETAs, congestion share |
 | `WeatherModule` | Distance-based route sampling, one batched Open-Meteo call, arrival-time bucket matching |
 | `LlmModule` | Gemma 4 transport with automatic capability downgrade |
 | `RecommendationModule` | Payload assembly, defensive parsing, contradiction repair, stale-cache fallback |
@@ -106,8 +107,8 @@ This is a judged criterion for the hackathon, and it shaped real decisions:
 
 - **Node 24 or newer** - required, the persistence layer uses the built-in `node:sqlite` module
 - A **Google AI Studio** API key ([free, no billing](https://aistudio.google.com/apikey))
-- A **Mapbox** public access token ([free tier, no card](https://account.mapbox.com/access-tokens/))
-- Open-Meteo needs no key at all
+- A **Mapbox** access token for routing ([free tier, no card](https://account.mapbox.com/access-tokens/))
+- Open-Meteo and Photon need no key at all
 
 ### Setup
 
@@ -236,6 +237,24 @@ Mount the disk at `/app/data`. Without it the free plan wipes SQLite on every de
 
 ---
 
+### Why search and routing use different providers
+
+Mapbox routes Ghana well but barely knows its place names. Measured against a live token:
+
+| Query | Mapbox Geocoding v6 | Photon / OpenStreetMap |
+| --- | --- | --- |
+| Accra Mall | Mallam, Mallam Borla | **Accra Mall** (shopping mall) |
+| University of Ghana | "Ghana", the country | **University of Ghana** |
+| Presec | *no results* | **Presbyterian Boys' Senior High School** |
+| Achimota | *no results* | **Achimota** town, School, Retail Centre |
+| Kotoka | Kotoko, a Kumasi locality | **Accra International Airport** |
+
+Mapbox's Search Box API does not rescue this - asked for POIs near Accra it returned an event organiser in Indonesia, and "coffee" near Accra returned nothing. The data simply is not there. OpenStreetMap has all of it, because it is mapped by people who live there.
+
+So `PlacesModule` uses Photon, which is built for type-ahead and needs no API key, and falls back to Mapbox geocoding if Photon is unreachable. Search is confined to `SEARCH_COUNTRY_CODE` and `SEARCH_BBOX`.
+
+OpenStreetMap answers a name query with *everything* carrying that name, so results are ranked before display: a search for "Accra Mall" also matches the bus stop outside it, its car park, and its food court. Results are tiered so the thing you would actually travel to comes first, near-duplicates sharing a name within 400 m are collapsed, and each result carries a plain-English category ("Shopping mall", "University") so the Achimota suburb is distinguishable from Achimota School.
+
 ## Honest limitations
 
 - **Weather grid resolution.** Open-Meteo has no high-resolution regional model over Ghana, so its global grid is roughly 11 km. On a short urban trip several sample points can land in the same grid cell and return the same forecast. The per-point values still differ, because each is read at a **different arrival time** - which is genuine signal - but the spatial resolution only starts paying off on longer trips. Verified against the live API during the build.
@@ -243,6 +262,8 @@ Mount the disk at `/app/data`. Without it the free plan wipes SQLite on every de
 - **Mid-trip re-alerting** was scoped as a stretch goal and is not built. The departure-window notification is, and it carries the proactive story on its own.
 - **Sampled ETA approximation.** Arrival time at each sample point assumes constant speed along the route. Good enough to pick the right 15-minute forecast bucket; not a claim about second-level accuracy.
 - **No accounts.** Clearing browser storage orphans saved destinations. That is the deliberate trade for having no login screen.
+- **Photon is a shared public instance.** Komoot runs it as a courtesy with no formal SLA and asks users to be fair. Fine for a demo; point `PHOTON_URL` at your own instance for real traffic.
+- **OpenStreetMap coverage is uneven.** It is excellent across Accra and the major cities, thinner in rural areas. Where it has nothing, search falls back to Mapbox, which returns administrative places only.
 
 ---
 

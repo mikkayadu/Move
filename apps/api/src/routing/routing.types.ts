@@ -1,14 +1,4 @@
-export interface Coordinates {
-  lat: number;
-  lon: number;
-}
-
-export interface Place extends Coordinates {
-  /** Short name, e.g. "Kotoka International Airport". */
-  name: string;
-  /** Full formatted address when the geocoder provides one. */
-  address: string;
-}
+export type { Coordinates, Place } from '../common/geo.types';
 
 export type TravelMode = 'driving' | 'walking';
 

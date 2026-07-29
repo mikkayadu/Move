@@ -1,10 +1,12 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { GemmaService } from '../llm/gemma.service';
+import { PlacesService } from '../places/places.service';
 import { RoutingService } from '../routing/routing.service';
 import { WeatherService } from '../weather/weather.service';
 import { AdviceParseError, parseAdvice } from './advice.parser';
 import { RecommendationStateRepository } from './recommendation-state.repository';
-import type { Coordinates, Place, RouteBundle, RouteOption } from '../routing/routing.types';
+import type { Coordinates, Place } from '../common/geo.types';
+import type { RouteBundle, RouteOption } from '../routing/routing.types';
 import type { RouteWeather } from '../weather/weather.types';
 import type { Advice, ModeSummary, RecommendationResult } from './recommendation.types';
 
@@ -26,6 +28,7 @@ export class RecommendationService {
 
   constructor(
     private readonly routing: RoutingService,
+    private readonly places: PlacesService,
     private readonly weather: WeatherService,
     private readonly gemma: GemmaService,
     private readonly state: RecommendationStateRepository,
@@ -78,7 +81,7 @@ export class RecommendationService {
 
   private async buildLive(request: RecommendationRequest): Promise<RecommendationResult> {
     const [originPlace, bundle] = await Promise.all([
-      this.routing.describeLocation(request.origin),
+      this.places.describeLocation(request.origin),
       this.routing.getRouteBundle(request.origin, request.destination),
     ]);
 

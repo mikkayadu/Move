@@ -1,10 +1,9 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { fetchJson, UpstreamError } from '../common/http.util';
+import type { Coordinates } from '../common/geo.types';
 import type {
-  Coordinates,
   FutureDepartureEta,
-  Place,
   RouteBundle,
   RouteOption,
   TravelMode,
@@ -27,18 +26,11 @@ interface MapboxDirectionsResponse {
   routes: MapboxRoute[];
 }
 
-interface MapboxGeocodeResponse {
-  features: Array<{
-    properties: {
-      name?: string;
-      full_address?: string;
-      place_formatted?: string;
-      coordinates?: { longitude: number; latitude: number };
-    };
-    geometry?: { coordinates: [number, number] };
-  }>;
-}
-
+/**
+ * Routes only. Place search and reverse geocoding live in PlacesService,
+ * which talks to a different provider - Mapbox routes Ghana well but barely
+ * knows its place names.
+ */
 @Injectable()
 export class RoutingService {
   private readonly logger = new Logger(RoutingService.name);
@@ -63,68 +55,6 @@ export class RoutingService {
 
   private get timeout(): number {
     return this.config.get<number>('upstreamTimeoutMs') ?? 8000;
-  }
-
-  /** Free-text destination search, biased toward the user's current position. */
-  async searchPlaces(query: string, near?: Coordinates, limit = 5): Promise<Place[]> {
-    const url = new URL('https://api.mapbox.com/search/geocode/v6/forward');
-    url.searchParams.set('q', query);
-    url.searchParams.set('access_token', this.token);
-    url.searchParams.set('limit', String(limit));
-    if (near) {
-      url.searchParams.set('proximity', `${near.lon},${near.lat}`);
-    }
-
-    const response = await fetchJson<MapboxGeocodeResponse>(url.toString(), {
-      source: 'mapbox-geocode',
-      timeoutMs: this.timeout,
-    });
-
-    return (response.features ?? []).flatMap((feature) => {
-      const lon = feature.properties.coordinates?.longitude ?? feature.geometry?.coordinates?.[0];
-      const lat = feature.properties.coordinates?.latitude ?? feature.geometry?.coordinates?.[1];
-      if (typeof lon !== 'number' || typeof lat !== 'number') return [];
-
-      const name = feature.properties.name ?? 'Unnamed place';
-      return [
-        {
-          name,
-          address: feature.properties.full_address ?? feature.properties.place_formatted ?? name,
-          lat,
-          lon,
-        },
-      ];
-    });
-  }
-
-  /** Turns a raw GPS fix into something we can show the user by name. */
-  async describeLocation(point: Coordinates): Promise<Place> {
-    const url = new URL('https://api.mapbox.com/search/geocode/v6/reverse');
-    url.searchParams.set('longitude', String(point.lon));
-    url.searchParams.set('latitude', String(point.lat));
-    url.searchParams.set('access_token', this.token);
-    url.searchParams.set('limit', '1');
-
-    try {
-      const response = await fetchJson<MapboxGeocodeResponse>(url.toString(), {
-        source: 'mapbox-reverse-geocode',
-        timeoutMs: this.timeout,
-        retries: 0,
-      });
-      const feature = response.features?.[0];
-      if (feature) {
-        const name = feature.properties.name ?? 'Current location';
-        return {
-          name,
-          address: feature.properties.full_address ?? feature.properties.place_formatted ?? name,
-          ...point,
-        };
-      }
-    } catch (error) {
-      this.logger.warn(`Reverse geocode failed, using raw coordinates: ${String(error)}`);
-    }
-
-    return { name: 'Current location', address: 'Your current position', ...point };
   }
 
   /**

@@ -1,12 +1,13 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsLatitude, IsLongitude, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
-import { RoutingService } from './routing.service';
-import type { Place } from './routing.types';
+import { PlacesService } from './places.service';
+import type { Place } from '../common/geo.types';
 
 class SearchQueryDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(120)
   q!: string;
 
   @IsOptional()
@@ -31,8 +32,8 @@ class ReverseQueryDto {
 }
 
 @Controller('places')
-export class RoutingController {
-  constructor(private readonly routing: RoutingService) {}
+export class PlacesController {
+  constructor(private readonly places: PlacesService) {}
 
   /** Destination autocomplete for the home screen. */
   @Get('search')
@@ -41,12 +42,12 @@ export class RoutingController {
       query.lat !== undefined && query.lon !== undefined
         ? { lat: query.lat, lon: query.lon }
         : undefined;
-    return this.routing.searchPlaces(query.q, near);
+    return this.places.searchPlaces(query.q, near);
   }
 
   /** Names the user's GPS fix so the UI can show "from <somewhere real>". */
   @Get('reverse')
   reverse(@Query() query: ReverseQueryDto): Promise<Place> {
-    return this.routing.describeLocation({ lat: query.lat, lon: query.lon });
+    return this.places.describeLocation({ lat: query.lat, lon: query.lon });
   }
 }

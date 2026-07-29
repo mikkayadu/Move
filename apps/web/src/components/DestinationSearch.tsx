@@ -91,7 +91,12 @@ export function DestinationSearch({ near, disabled, onPick }: Props) {
           {results.map((place) => (
             <li key={`${place.lat},${place.lon},${place.name}`}>
               <button type="button" className="search__result" onClick={() => choose(place)}>
-                <span className="search__result-name">{place.name}</span>
+                <span className="search__result-top">
+                  <span className="search__result-name">{place.name}</span>
+                  {place.category && (
+                    <span className="search__result-kind">{place.category}</span>
+                  )}
+                </span>
                 <span className="search__result-address">{place.address}</span>
               </button>
             </li>

@@ -17,6 +17,8 @@ export interface Place {
   address: string;
   lat: number;
   lon: number;
+  /** "Shopping mall", "University", "Town" - what kind of place this is. */
+  category?: string;
 }
 
 export interface ModeSummary {

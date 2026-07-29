@@ -15,6 +15,14 @@ export interface AppConfig {
   googleAiApiKey: string;
   gemmaModel: string;
   mapboxAccessToken: string;
+  /** Where destination search looks, and which provider answers it. */
+  search: {
+    /** ISO 3166-1 alpha-2. Results outside this country are discarded. */
+    countryCode: string;
+    /** "west,south,east,north" passed to the geocoder to narrow the index. */
+    bbox: string;
+    photonUrl: string;
+  };
   vapid: {
     publicKey: string;
     privateKey: string;
@@ -53,6 +61,12 @@ export default (): AppConfig => ({
   googleAiApiKey: process.env.GOOGLE_AI_API_KEY ?? '',
   gemmaModel: process.env.GEMMA_MODEL ?? 'gemma-4-e4b-it',
   mapboxAccessToken: process.env.MAPBOX_ACCESS_TOKEN ?? '',
+  search: {
+    countryCode: process.env.SEARCH_COUNTRY_CODE ?? 'GH',
+    // Ghana, west/south/east/north.
+    bbox: process.env.SEARCH_BBOX ?? '-3.26,4.71,1.21,11.18',
+    photonUrl: (process.env.PHOTON_URL ?? 'https://photon.komoot.io').replace(/\/$/, ''),
+  },
   vapid: {
     publicKey: process.env.VAPID_PUBLIC_KEY ?? '',
     privateKey: process.env.VAPID_PRIVATE_KEY ?? '',
