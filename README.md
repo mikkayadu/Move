@@ -229,7 +229,9 @@ The API cannot be a static site: it holds the API keys, owns the SQLite file, an
 
 **API.** `apps/api/Dockerfile` builds a self-contained image, so anything that runs a container will host it. It listens on `PORT` (default 3001) and answers `GET /api/health` for health checks. Required environment: `GOOGLE_AI_API_KEY`, `MAPBOX_ACCESS_TOKEN`, `GEMMA_MODEL`, `CORS_ORIGINS`, and the VAPID pair if you want push.
 
-**PWA.** Build with `npm run build --workspace @move/web` and publish `apps/web/dist`. `apps/web/public/_redirects` carries the single-page routing rule in a format most static hosts understand; `netlify.toml` is included if you use Netlify.
+**PWA.** Build with `npm run build --workspace @move/web` and publish `apps/web/dist`. Most static hosts detect Vite and need no configuration.
+
+On Vercel, set **Root Directory** to `apps/web` - the rest is detected. `apps/web/vercel.json` only sets cache headers: the service worker and manifest must revalidate, or a user is stranded on an old build, while the content-hashed files under `/assets` can be cached forever. `apps/web/public/_redirects` carries a single-page routing rule for hosts that want one.
 
 **Two values wire the halves together, and both are manual:**
 
