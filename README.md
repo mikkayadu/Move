@@ -220,10 +220,10 @@ curl -X POST http://localhost:3001/api/notifications/sweep
 
 The two halves deploy separately.
 
-| Piece | Type | Where | Config |
-| --- | --- | --- | --- |
-| API | **Web service** - a process that must stay running | Render | `render.yaml`, `apps/api/Dockerfile` |
-| PWA | **Static site** - just built files, nothing executes | Anywhere static | `netlify.toml` if you use Netlify |
+| Piece | Deploys as | Build artefact |
+| --- | --- | --- |
+| API | **Web service** - a process that must stay running | `apps/api/Dockerfile` |
+| PWA | **Static site** - just built files, nothing executes | `apps/web/dist` |
 
 The API cannot be a static site: it holds the API keys, owns the SQLite file, and runs the notification timer. The PWA should not be a web service: `vite build` produces finished files, so a CDN serves them better and free.
 
