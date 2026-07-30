@@ -108,6 +108,50 @@ export class NotificationsScheduler implements OnModuleInit {
     return { checked, notified };
   }
 
+  /**
+   * Sets up a demonstrable "before" state.
+   *
+   * The departure-window alert deliberately fires only when the answer
+   * improves, which is right for users and awkward for a demo: you cannot
+   * make real traffic clear on cue. This rewrites the *stored previous*
+   * answer for this device to "wait", so the next sweep travels the genuine
+   * change-detection path and fires a real notification.
+   *
+   * Only the starting state is arranged. The verdict that triggers the alert
+   * is still computed live from Mapbox, Open-Meteo, and Gemma.
+   */
+  armForDemo(deviceId: string): { armed: number; destinations: string[] } {
+    const watched = this.destinations
+      .listWatched()
+      .filter((destination) => destination.deviceId === deviceId);
+
+    const byId = new Map(watched.map((destination) => [destination.id, destination.label]));
+    const touched: string[] = [];
+    let armed = 0;
+
+    for (const stored of this.state.listForDevice(deviceId)) {
+      const label = stored.destinationId ? byId.get(stored.destinationId) : undefined;
+      if (!label) continue;
+
+      this.state.save(stored.cacheKey, deviceId, stored.destinationId, {
+        ...stored.result,
+        advice: {
+          ...stored.result.advice,
+          recommendation: 'wait',
+          wait_minutes: 20,
+          leave_by_time: null,
+          headline: 'Wait 20 minutes, conditions on your route are poor.',
+        },
+      });
+
+      armed += 1;
+      if (!touched.includes(label)) touched.push(label);
+    }
+
+    this.logger.log(`Demo armed for ${deviceId}: ${armed} stored answer(s) set to "wait"`);
+    return { armed, destinations: touched };
+  }
+
   private resolveOrigin(deviceId: string): { lat: number; lon: number } | null {
     const latest = this.state.findLatestForDevice(deviceId);
     if (!latest) return null;

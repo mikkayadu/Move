@@ -63,6 +63,27 @@ export class RecommendationStateRepository {
     return this.hydrate(row);
   }
 
+  /** Every stored answer for a device, newest first. */
+  listForDevice(deviceId: string): Array<StoredRecommendation & { cacheKey: string; destinationId: string | null }> {
+    const rows = this.database
+      .prepare(
+        `SELECT cache_key, destination_id, result_json, created_at FROM recommendation_state
+         WHERE device_id = ? ORDER BY created_at DESC`,
+      )
+      .all(deviceId) as unknown as Array<{
+      cache_key: string;
+      destination_id: string | null;
+      result_json: string;
+      created_at: string;
+    }>;
+
+    return rows.flatMap((row) => {
+      const stored = this.hydrate(row);
+      if (!stored) return [];
+      return [{ ...stored, cacheKey: row.cache_key, destinationId: row.destination_id }];
+    });
+  }
+
   /**
    * The most recent answer for a device, whatever the trip.
    *
