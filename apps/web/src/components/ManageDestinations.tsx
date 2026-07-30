@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { BellIcon, TrashIcon } from './icons';
+import { api } from '../lib/api';
+import { getDeviceId } from '../lib/device';
 import type { PushState } from '../hooks/usePush';
 import type { SavedDestination } from '../lib/types';
 
@@ -74,7 +77,77 @@ export function ManageDestinations({
           ))}
         </ul>
       )}
+
+      <DevicePanel subscribed={push.status === 'subscribed'} />
     </section>
+  );
+}
+
+/**
+ * Shows the anonymous id this browser is known by, and lets it fire a test
+ * push at itself.
+ *
+ * Both exist because there is no account: when something does not arrive,
+ * this id is the only handle on "which device", and on a phone it is
+ * otherwise buried in developer tools nobody can reach.
+ */
+function DevicePanel({ subscribed }: { subscribed: boolean }) {
+  const deviceId = getDeviceId();
+  const [copied, setCopied] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+
+  const copy = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(deviceId);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // Clipboard is blocked in some mobile contexts; the id is on screen
+      // to be read or selected by hand anyway.
+      setCopied(false);
+    }
+  };
+
+  const test = async (): Promise<void> => {
+    setSending(true);
+    setSent(null);
+    try {
+      const { delivered } = await api.testPush();
+      setSent(
+        delivered > 0
+          ? `Sent to ${delivered} device${delivered === 1 ? '' : 's'}.`
+          : 'No device is subscribed yet.',
+      );
+    } catch {
+      setSent('Could not reach the server.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="device">
+      <h3 className="why__title">This device</h3>
+
+      <button type="button" className="device__id" onClick={() => void copy()} title="Tap to copy">
+        <code>{deviceId}</code>
+        <span className="device__copy">{copied ? 'Copied' : 'Copy'}</span>
+      </button>
+
+      {subscribed && (
+        <button
+          type="button"
+          className="button button--ghost button--small"
+          onClick={() => void test()}
+          disabled={sending}
+        >
+          {sending ? 'Sending...' : 'Send a test notification'}
+        </button>
+      )}
+
+      {sent && <p className="device__result">{sent}</p>}
+    </div>
   );
 }
 
