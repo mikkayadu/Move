@@ -227,25 +227,22 @@ The two halves deploy separately.
 
 The API cannot be a static site: it holds the API keys, owns the SQLite file, and runs the notification timer. The PWA should not be a web service: `vite build` produces finished files, so a CDN serves them better and free.
 
-**API on Render:** create a Blueprint Instance pointed at the repo, then fill in every value marked `sync: false` - `GOOGLE_AI_API_KEY`, `MAPBOX_ACCESS_TOKEN`, `GEMMA_MODEL`, the VAPID pair, and `CORS_ORIGINS`.
+**API.** `apps/api/Dockerfile` builds a self-contained image, so anything that runs a container will host it. It listens on `PORT` (default 3001) and answers `GET /api/health` for health checks. Required environment: `GOOGLE_AI_API_KEY`, `MAPBOX_ACCESS_TOKEN`, `GEMMA_MODEL`, `CORS_ORIGINS`, and the VAPID pair if you want push.
 
-**PWA anywhere static:** build with `npm run build --workspace @move/web` and publish `apps/web/dist`. `apps/web/public/_redirects` carries the single-page routing rule in a format both Netlify and Render understand.
+**PWA.** Build with `npm run build --workspace @move/web` and publish `apps/web/dist`. `apps/web/public/_redirects` carries the single-page routing rule in a format most static hosts understand; `netlify.toml` is included if you use Netlify.
 
 **Two values wire the halves together, and both are manual:**
 
-1. `CORS_ORIGINS` on Render → the origin the PWA is served from
-2. `VITE_API_BASE_URL` on the frontend host → the API's URL, set at **build** time
+1. `CORS_ORIGINS` on the API → the origin the PWA is served from
+2. `VITE_API_BASE_URL` on the frontend host → the API's URL, read at **build** time, so changing it means rebuilding
 
-Get either wrong and the browser blocks every request. A bare hostname is fine for both: each side adds the `https://` scheme itself.
+Get either wrong and the browser blocks every request while the page itself loads fine. A bare hostname is accepted for both: each side adds the `https://` scheme itself.
 
 HTTPS is required: service workers and Web Push do not work over plain HTTP.
 
-**Free-tier caveats, both real:**
+**If you host the API on a free tier, expect two things.** Free instances usually sleep when idle and take up to a minute to wake, so the page loads instantly and the first recommendation hangs - warm it before a demo, or point an uptime check at `/api/health`. And free instances rarely offer persistent storage, so SQLite sits on an ephemeral filesystem: saved destinations, push subscriptions, and the stale cache are wiped on every deploy and restart. The schema is re-created on boot, so the app starts empty rather than broken. Mount a volume at `/app/data` (or set `DATABASE_PATH` elsewhere) to keep data.
 
-- **Persistent disks require a paid instance.** On the free plan SQLite sits on ephemeral storage, so saved destinations, push subscriptions, and the stale cache are wiped on every deploy and every wake from sleep. The schema is re-created on boot, so the app starts empty rather than broken. To keep data, switch the API to `plan: starter` and uncomment the `disk:` block in `render.yaml`.
-- **Free web services sleep when idle** and take the better part of a minute to wake. The static site never sleeps, so the page loads instantly and then the first recommendation hangs. Warm the API before demoing, or pay for the API instance. This also means the background notification sweep only runs while something is keeping the service awake.
-
-`netlify.toml` is kept as an alternative host for the PWA. `apps/web/public/_redirects` carries the single-page routing rule in a format both providers understand, so routing survives a change of host.
+A sleeping instance also runs no timers, so the departure-window sweep only fires while something is keeping the service awake.
 
 ---
 
