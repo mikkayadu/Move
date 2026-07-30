@@ -78,3 +78,62 @@ export function pointsAlongRoute(
 function round6(value: number): number {
   return Math.round(value * 1e6) / 1e6;
 }
+
+/**
+ * Cuts the route into consecutive sub-paths at the given fractions.
+ *
+ * Used to colour the map by weather: each slice spans the stretch between two
+ * forecast sample points, so it can be drawn in the colour of the conditions
+ * the traveller meets there. Slices share their boundary vertex, which keeps
+ * the drawn line continuous with no gap between colours.
+ */
+export function sliceByFractions(
+  geometry: Array<[number, number]>,
+  fractions: number[],
+): Array<Array<[number, number]>> {
+  if (geometry.length < 2 || fractions.length < 2) return [];
+
+  const cumulative: number[] = [0];
+  for (let i = 1; i < geometry.length; i += 1) {
+    cumulative.push(cumulative[i - 1] + haversineMeters(geometry[i - 1], geometry[i]));
+  }
+  const total = cumulative[cumulative.length - 1];
+  if (total === 0) return [];
+
+  const slices: Array<Array<[number, number]>> = [];
+
+  for (let i = 0; i < fractions.length - 1; i += 1) {
+    const from = Math.min(1, Math.max(0, fractions[i])) * total;
+    const to = Math.min(1, Math.max(0, fractions[i + 1])) * total;
+    if (to <= from) continue;
+
+    const slice: Array<[number, number]> = [interpolateAt(geometry, cumulative, from)];
+
+    for (let v = 0; v < geometry.length; v += 1) {
+      if (cumulative[v] > from && cumulative[v] < to) slice.push(geometry[v]);
+    }
+
+    slice.push(interpolateAt(geometry, cumulative, to));
+    slices.push(slice);
+  }
+
+  return slices;
+}
+
+function interpolateAt(
+  geometry: Array<[number, number]>,
+  cumulative: number[],
+  target: number,
+): [number, number] {
+  let index = cumulative.findIndex((value) => value >= target);
+  if (index <= 0) index = 1;
+
+  const segmentStart = cumulative[index - 1];
+  const segmentLength = cumulative[index] - segmentStart;
+  const ratio = segmentLength === 0 ? 0 : (target - segmentStart) / segmentLength;
+
+  const [lonA, latA] = geometry[index - 1];
+  const [lonB, latB] = geometry[index];
+
+  return [round6(lonA + (lonB - lonA) * ratio), round6(latA + (latB - latA) * ratio)];
+}

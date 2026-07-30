@@ -28,7 +28,21 @@ The recommendation card is the whole product. Above the fold is the answer; belo
 - **Mode** - drive or walk, chosen holistically from both ETAs and the weather
 - **Stats** - ETA, delay against typical conditions, distance
 - **Advisory** - "Bring an umbrella", "Add 10 min buffer, roads will be wet"
-- **Why** - the model's reasoning, the per-point weather timeline, the later-departure comparison
+- **Why** - the model's reasoning, the route map, the per-point weather timeline, the later-departure comparison
+
+### The route map
+
+Inside the "why" drawer, the route is drawn as a single static image with the line **coloured by the weather you will meet on it**: green where it is dry, blue where rain is expected by the time you arrive there.
+
+It is deliberately not an interactive map. An interactive one costs about 250 KB of JavaScript plus tile downloads on every pan, shows a grey rectangle offline, and would require shipping a public Mapbox token to the browser. A static image is one 77 KB request, renders identically offline once cached, and keeps the token on the server.
+
+Three details make it cheap:
+
+- **Lazy.** The drawer is closed by default, so most sessions never request the image at all.
+- **Simplified.** Douglas-Peucker thins a 12 km route from 162 points to about 28 before encoding - visually identical at 640 px, and it keeps the request URL far under Mapbox's 8192-character limit.
+- **Proxied.** The client gets `/api/map/<id>.png`, an opaque id backed by a stored route shape. The Mapbox token never leaves the server, and the browser caches the result like any other image.
+
+`mapbox/dark-v11` is used rather than a navigation style, because navigation styles paint their own traffic colours over the roads, which compete with the green/blue and read as this route's congestion.
 
 ---
 
@@ -56,6 +70,7 @@ React PWA  ──POST /api/recommendation──▶  NestJS API
 | --- | --- |
 | `PlacesModule` | Destination search and reverse geocoding via Photon/OpenStreetMap, Ghana-restricted, with result ranking |
 | `RoutingModule` | Mapbox driving-traffic and walking routes, predictive `depart_at` ETAs, congestion share |
+| `MapModule` | Static route image coloured by the weather, proxied so the Mapbox token stays server-side |
 | `WeatherModule` | Distance-based route sampling, one batched Open-Meteo call, arrival-time bucket matching |
 | `LlmModule` | Gemma 4 transport with automatic capability downgrade |
 | `RecommendationModule` | Payload assembly, defensive parsing, contradiction repair, stale-cache fallback |

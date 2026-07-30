@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AlertIcon, CarIcon, ChevronIcon, WalkIcon } from './icons';
+import { RouteMap } from './RouteMap';
 import { WeatherAlongRoute } from './WeatherAlongRoute';
 import type { ModeSummary, RecommendationResult } from '../lib/types';
 
@@ -62,6 +63,8 @@ export function RecommendationCard({ result }: Props) {
       {expanded && (
         <div className="why">
           <p className="why__reasoning">{advice.reasoning}</p>
+
+          {result.mapUrl && <RouteMap mapUrl={result.mapUrl} weather={result.weather} />}
 
           <WeatherAlongRoute weather={result.weather} />
 

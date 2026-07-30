@@ -87,6 +87,17 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
       CREATE INDEX IF NOT EXISTS idx_recommendation_state_device
         ON recommendation_state (device_id);
+
+      -- Route shapes behind an opaque id, so the static map can be proxied
+      -- without ever handing the Mapbox token to a browser.
+      CREATE TABLE IF NOT EXISTS map_snapshots (
+        id           TEXT PRIMARY KEY,
+        payload_json TEXT NOT NULL,
+        created_at   TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_map_snapshots_created
+        ON map_snapshots (created_at);
     `);
   }
 }

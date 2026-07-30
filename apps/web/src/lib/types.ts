@@ -64,6 +64,8 @@ export interface RecommendationResult {
   predictiveTrafficAvailable: boolean;
   weather: RouteWeather;
   model: string;
+  /** Server path to the route image, or null when unavailable. */
+  mapUrl: string | null;
   generatedAt: string;
   stale: boolean;
   staleReason?: string;

@@ -39,6 +39,12 @@ export interface RecommendationResult {
   predictiveTrafficAvailable: boolean;
   weather: RouteWeather;
   model: string;
+  /**
+   * Path to the route image, e.g. "/api/map/<id>.png". Null when Mapbox is
+   * unconfigured or the route has no drawable shape. The client fetches it
+   * lazily, only when the "why" drawer is opened.
+   */
+  mapUrl: string | null;
   generatedAt: string;
   /** True when live data could not be fetched and this is a replayed answer. */
   stale: boolean;

@@ -4,6 +4,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import configuration from './config/configuration';
 import { HealthController } from './health.controller';
 import { PersistenceModule } from './persistence/persistence.module';
+import { MapModule } from './map/map.module';
 import { PlacesModule } from './places/places.module';
 import { RoutingModule } from './routing/routing.module';
 import { WeatherModule } from './weather/weather.module';
@@ -23,6 +24,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     }),
     ScheduleModule.forRoot(),
     PersistenceModule,
+    MapModule,
     PlacesModule,
     RoutingModule,
     WeatherModule,

@@ -15,6 +15,9 @@ export interface AppConfig {
   googleAiApiKey: string;
   gemmaModel: string;
   mapboxAccessToken: string;
+  /** Mapbox style and pixel size for the static route image. */
+  mapStyle: string;
+  mapSize: string;
   /** Where destination search looks, and which provider answers it. */
   search: {
     /** ISO 3166-1 alpha-2. Results outside this country are discarded. */
@@ -61,6 +64,12 @@ export default (): AppConfig => ({
   googleAiApiKey: process.env.GOOGLE_AI_API_KEY ?? '',
   gemmaModel: process.env.GEMMA_MODEL ?? 'gemma-4-e4b-it',
   mapboxAccessToken: process.env.MAPBOX_ACCESS_TOKEN ?? '',
+  // Navigation styles paint their own traffic colours, which would compete
+  // with the green/blue used here to mean dry/wet.
+  mapStyle: process.env.MAP_STYLE ?? 'dark-v11',
+  // Retina doubles the byte cost for a picture that is glanced at, so the
+  // default stays at 1x. "640x360@2x" is available if you want it crisper.
+  mapSize: process.env.MAP_SIZE ?? '640x360',
   search: {
     countryCode: process.env.SEARCH_COUNTRY_CODE ?? 'GH',
     // Ghana, west/south/east/north.

@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { GemmaService } from '../llm/gemma.service';
+import { StaticMapService } from '../map/static-map.service';
 import { PlacesService } from '../places/places.service';
 import { RoutingService } from '../routing/routing.service';
 import { WeatherService } from '../weather/weather.service';
@@ -31,6 +32,7 @@ export class RecommendationService {
     private readonly places: PlacesService,
     private readonly weather: WeatherService,
     private readonly gemma: GemmaService,
+    private readonly staticMap: StaticMapService,
     private readonly state: RecommendationStateRepository,
   ) {}
 
@@ -107,6 +109,8 @@ export class RecommendationService {
       predictiveTrafficAvailable: bundle.predictiveTrafficAvailable,
       weather,
       model: this.gemma.model,
+      // Drawing the map must never cost us the recommendation.
+      mapUrl: this.buildMapUrl(primary.geometry, weather, originPlace, destination),
       generatedAt: new Date().toISOString(),
       stale: false,
     };
@@ -129,6 +133,20 @@ export class RecommendationService {
         rainClearsInMinutes: null,
         summary: 'Weather data unavailable for this route.',
       };
+    }
+  }
+
+  private buildMapUrl(
+    geometry: Array<[number, number]>,
+    weather: RouteWeather,
+    origin: Place,
+    destination: Place,
+  ): string | null {
+    try {
+      return this.staticMap.createSnapshot(geometry, weather, origin, destination);
+    } catch (error) {
+      this.logger.warn(`Could not prepare the route map: ${String(error)}`);
+      return null;
     }
   }
 

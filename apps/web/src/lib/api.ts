@@ -51,6 +51,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * Turns a server-relative path such as "/api/map/<id>.png" into something the
+ * browser can load, which in production means prefixing the API origin.
+ */
+export function absoluteUrl(path: string): string {
+  return `${BASE}${path}`;
+}
+
 export const api = {
   health: () =>
     request<{ status: string; model: string; configured: Record<string, boolean> }>('/health'),
