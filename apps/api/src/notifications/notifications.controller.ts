@@ -65,17 +65,4 @@ export class NotificationsController {
   sweep(): Promise<{ checked: number; notified: number }> {
     return this.scheduler.sweep();
   }
-
-  /**
-   * Demo aid: rewrites this device's stored previous answers to "wait", so
-   * the next sweep sees the verdict improve and fires for real.
-   *
-   * It arranges the "before" state only. The alert itself still comes from a
-   * live recommendation, through the same change detection users get.
-   */
-  @Post('demo/arm')
-  @HttpCode(200)
-  arm(@DeviceId() deviceId: string): { armed: number; destinations: string[] } {
-    return this.scheduler.armForDemo(deviceId);
-  }
 }

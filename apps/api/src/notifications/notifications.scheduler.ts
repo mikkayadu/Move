@@ -61,7 +61,16 @@ export class NotificationsScheduler implements OnModuleInit {
 
       for (const destination of watched) {
         const origin = this.resolveOrigin(destination.deviceId);
-        if (!origin) continue;
+
+        // The last known position has aged out. Watching from a location the
+        // user left hours ago produces confident nonsense, so stop.
+        if (!origin) {
+          this.destinations.setNotify(destination.deviceId, destination.id, false);
+          this.logger.log(
+            `Stopped watching ${destination.label}: last known location is too old`,
+          );
+          continue;
+        }
 
         const previous = this.state.findLatestForDestination(
           destination.deviceId,
@@ -70,7 +79,7 @@ export class NotificationsScheduler implements OnModuleInit {
 
         try {
           const next = await this.recommendations.getRecommendation(destination.deviceId, {
-            origin,
+            origin: { lat: origin.lat, lon: origin.lon },
             destination: {
               lat: destination.lat,
               lon: destination.lon,
@@ -78,6 +87,7 @@ export class NotificationsScheduler implements OnModuleInit {
               address: destination.address,
             },
             destinationId: destination.id,
+            originCapturedAt: origin.capturedAt,
           });
           checked += 1;
 
@@ -95,7 +105,15 @@ export class NotificationsScheduler implements OnModuleInit {
 
           if (delivered > 0) {
             notified += 1;
-            this.logger.log(`Departure window pushed for ${destination.label}`);
+
+            // One alert per armed destination, then done. Move cannot see that
+            // you have set off - a service worker has no access to location -
+            // so continuing to watch risks nagging about a trip already under
+            // way or finished. Telling you once is the whole job.
+            this.destinations.setNotify(destination.deviceId, destination.id, false);
+            this.logger.log(
+              `Departure window pushed for ${destination.label}; watching switched off`,
+            );
           }
         } catch (error) {
           this.logger.warn(`Sweep failed for ${destination.label}: ${String(error)}`);
@@ -109,57 +127,26 @@ export class NotificationsScheduler implements OnModuleInit {
   }
 
   /**
-   * Sets up a demonstrable "before" state.
+   * The device's last reported position, if it is still recent enough to
+   * plan from.
    *
-   * The departure-window alert deliberately fires only when the answer
-   * improves, which is right for users and awkward for a demo: you cannot
-   * make real traffic clear on cue. This rewrites the *stored previous*
-   * answer for this device to "wait", so the next sweep travels the genuine
-   * change-detection path and fires a real notification.
-   *
-   * Only the starting state is arranged. The verdict that triggers the alert
-   * is still computed live from Mapbox, Open-Meteo, and Gemma.
+   * Age is measured from when the position was *captured*, not from when the
+   * row was last written. Those differ because every sweep rewrites the row:
+   * measuring the row's age would refresh the very timestamp being checked,
+   * and the guard could never fire.
    */
-  armForDemo(deviceId: string): { armed: number; destinations: string[] } {
-    const watched = this.destinations
-      .listWatched()
-      .filter((destination) => destination.deviceId === deviceId);
-
-    const byId = new Map(watched.map((destination) => [destination.id, destination.label]));
-    const touched: string[] = [];
-    let armed = 0;
-
-    for (const stored of this.state.listForDevice(deviceId)) {
-      const label = stored.destinationId ? byId.get(stored.destinationId) : undefined;
-      if (!label) continue;
-
-      this.state.save(stored.cacheKey, deviceId, stored.destinationId, {
-        ...stored.result,
-        advice: {
-          ...stored.result.advice,
-          recommendation: 'wait',
-          wait_minutes: 20,
-          leave_by_time: null,
-          headline: 'Wait 20 minutes, conditions on your route are poor.',
-        },
-      });
-
-      armed += 1;
-      if (!touched.includes(label)) touched.push(label);
-    }
-
-    this.logger.log(`Demo armed for ${deviceId}: ${armed} stored answer(s) set to "wait"`);
-    return { armed, destinations: touched };
-  }
-
-  private resolveOrigin(deviceId: string): { lat: number; lon: number } | null {
+  private resolveOrigin(
+    deviceId: string,
+  ): { lat: number; lon: number; capturedAt: string } | null {
     const latest = this.state.findLatestForDevice(deviceId);
     if (!latest) return null;
 
-    const ageHours = (Date.now() - new Date(latest.createdAt).getTime()) / 3_600_000;
-    if (ageHours > MAX_ORIGIN_AGE_HOURS) return null;
+    // Answers stored before this field existed fall back to the row's time.
+    const capturedAt = latest.result.originCapturedAt ?? latest.createdAt;
+    const ageHours = (Date.now() - new Date(capturedAt).getTime()) / 3_600_000;
+    if (!Number.isFinite(ageHours) || ageHours > MAX_ORIGIN_AGE_HOURS) return null;
 
-    return { lat: latest.result.origin.lat, lon: latest.result.origin.lon };
+    return { lat: latest.result.origin.lat, lon: latest.result.origin.lon, capturedAt };
   }
 }
 

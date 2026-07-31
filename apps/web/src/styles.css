@@ -1045,6 +1045,18 @@ svg {
   border-radius: var(--radius);
 }
 
+.hint {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-faint);
+}
+
+.hint strong {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
 .saved-list {
   list-style: none;
   margin: 0;
@@ -1128,61 +1140,6 @@ svg {
 .icon-button--danger:hover {
   color: var(--bad);
   border-color: rgba(249, 122, 122, 0.45);
-}
-
-/* --------------------------------------------------------------------------
-   Device panel
-   -------------------------------------------------------------------------- */
-.device {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 8px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-
-.device__id {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 11px 13px;
-  cursor: pointer;
-  text-align: left;
-  transition: border-color 0.15s ease;
-}
-
-.device__id:hover {
-  border-color: var(--border-strong);
-}
-
-.device__id code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.76rem;
-  color: var(--text-dim);
-  /* Long ids must wrap rather than force the panel wider than the phone. */
-  overflow-wrap: anywhere;
-}
-
-.device__copy {
-  flex: none;
-  font-size: 0.7rem;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--accent);
-}
-
-.device__result {
-  margin: 0;
-  font-size: 0.8rem;
-  color: var(--text-faint);
 }
 
 /* --------------------------------------------------------------------------

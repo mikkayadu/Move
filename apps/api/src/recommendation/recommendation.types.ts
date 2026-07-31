@@ -40,6 +40,15 @@ export interface RecommendationResult {
   weather: RouteWeather;
   model: string;
   /**
+   * When the origin coordinates were actually captured from the device.
+   *
+   * Distinct from `generatedAt`: a background re-check inherits the origin
+   * from the last real user request, so this timestamp must not move when the
+   * answer is recomputed. It is what tells the sweep the location has gone
+   * stale and watching should stop.
+   */
+  originCapturedAt: string;
+  /**
    * Path to the route image, e.g. "/api/map/<id>.png". Null when Mapbox is
    * unconfigured or the route has no drawable shape. The client fetches it
    * lazily, only when the "why" drawer is opened.

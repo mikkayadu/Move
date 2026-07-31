@@ -18,6 +18,12 @@ export interface RecommendationRequest {
   timezone?: string;
   /** Set when the trip targets a saved destination, for change detection. */
   destinationId?: string;
+  /**
+   * Carried forward by the background sweep, which reuses an origin captured
+   * earlier rather than a fresh fix. Absent on a real user request, where the
+   * position is being reported right now.
+   */
+  originCapturedAt?: string;
 }
 
 /** Walking is never the answer beyond this, whatever the model thinks. */
@@ -111,6 +117,9 @@ export class RecommendationService {
       model: this.gemma.model,
       // Drawing the map must never cost us the recommendation.
       mapUrl: this.buildMapUrl(primary.geometry, weather, originPlace, destination),
+      // A sweep passes the original capture time through, so re-checking does
+      // not make a stale location look freshly reported.
+      originCapturedAt: request.originCapturedAt ?? new Date().toISOString(),
       generatedAt: new Date().toISOString(),
       stale: false,
     };
